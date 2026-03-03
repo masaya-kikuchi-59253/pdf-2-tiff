@@ -53,7 +53,7 @@ app.post('/api/pdf-info', upload.single('pdf'), async (req, res) => {
 
 app.post('/api/convert', async (req, res) => {
     try {
-        const { pdfPath, mode, dpi = 400 } = req.body;
+        const { pdfPath, mode, dpi = 400, split = true } = req.body;
         const resolution = parseInt(dpi) || 400;
         const fileName = path.basename(pdfPath, '.pdf');
         const sessionOutDir = path.join(OUT_DIR, path.basename(path.dirname(pdfPath)));
@@ -61,6 +61,7 @@ app.post('/api/convert', async (req, res) => {
 
         // 1. Determine mode if auto
         let debugStats = [];
+        let finalMode = mode;
         if (mode === 'auto') {
             const inkcovCmd = `"${GS_PATH}" -o - -sDEVICE=inkcov -dNOPAUSE -dBATCH "${pdfPath}"`;
             const gsOutput = await execPromise(inkcovCmd);
@@ -75,7 +76,6 @@ app.post('/api/convert', async (req, res) => {
                         const magenta = parseFloat(values[1]);
                         const yellow = parseFloat(values[2]);
                         debugStats.push({ cyan, magenta, yellow });
-                        // 閾値を 0.1 (10%) に引き上げ、より確実に白黒判定を行う
                         if (cyan > 0.1 || magenta > 0.1 || yellow > 0.1) {
                             hasColor = true;
                         }
@@ -87,7 +87,9 @@ app.post('/api/convert', async (req, res) => {
 
         // 2. Convert to TIFF & PNG previews
         const dev = finalMode === 'color' ? 'tiff24nc' : 'tiffg4';
-        const outPattern = path.join(sessionOutDir, `${fileName}_page_%d.tif`);
+        const outPattern = split
+            ? path.join(sessionOutDir, `${fileName}_page_%d.tif`)
+            : path.join(sessionOutDir, `${fileName}.tif`);
         const pngPattern = path.join(sessionOutDir, `${fileName}_page_%d.png`);
 
         const convertTiffCmd = `"${GS_PATH}" -dNOPAUSE -dBATCH -sDEVICE=${dev} -r${resolution} -sOutputFile="${outPattern}" "${pdfPath}"`;
@@ -98,47 +100,46 @@ app.post('/api/convert', async (req, res) => {
             execPromise(convertPngCmd)
         ]);
 
-        // 3. Rename files with zero-padded page numbers for correct sort order
+        // 3. Rename/Sort files
         const rawFiles = await fs.readdir(sessionOutDir);
-        const tifFiles = rawFiles.filter(f => f.endsWith('.tif')).sort((a, b) => {
-            const na = parseInt(a.match(/page_(\d+)/)?.[1] || '0');
-            const nb = parseInt(b.match(/page_(\d+)/)?.[1] || '0');
-            return na - nb;
-        });
-        const totalPages = tifFiles.length;
-        const padLen = Math.max(2, String(totalPages).length); // At least 2 digits
+        if (split) {
+            const tifFiles = rawFiles.filter(f => f.endsWith('.tif'));
+            const totalPages = tifFiles.length;
+            const padLen = Math.max(2, String(totalPages).length);
 
-        for (const f of rawFiles) {
-            const pageMatch = f.match(/page_(\d+)\.(tif|png)$/);
-            if (pageMatch) {
-                const paddedNum = pageMatch[1].padStart(padLen, '0');
-                const newName = f.replace(`page_${pageMatch[1]}`, `page_${paddedNum}`);
-                if (newName !== f) {
-                    await fs.rename(
-                        path.join(sessionOutDir, f),
-                        path.join(sessionOutDir, newName)
-                    );
+            for (const f of rawFiles) {
+                const pageMatch = f.match(/page_(\d+)\.(tif|png)$/);
+                if (pageMatch) {
+                    const paddedNum = pageMatch[1].padStart(padLen, '0');
+                    const newName = f.replace(`page_${pageMatch[1]}`, `page_${paddedNum}`);
+                    if (newName !== f) {
+                        await fs.rename(path.join(sessionOutDir, f), path.join(sessionOutDir, newName));
+                    }
                 }
             }
         }
 
-        // 4. List generated files (after rename)
-        const allFiles = await fs.readdir(sessionOutDir);
-        const resultFiles = allFiles
+        // 4. List generated files
+        const finalFiles = await fs.readdir(sessionOutDir);
+        const resultFiles = finalFiles
             .filter(f => f.endsWith('.tif'))
             .sort()
             .map(f => {
                 const pageMatch = f.match(/page_(\d+)\.tif/);
                 const pageNum = pageMatch ? pageMatch[1] : '01';
-                const pngName = f.replace('.tif', '.png').replace(/page_(\d+)\.png/, `page_${pageNum}.png`);
+                const previewFile = split
+                    ? `${fileName}_page_${pageNum}.png`
+                    : `${fileName}_page_1.png`; // First page as preview for merged TIFF
                 return {
                     name: f,
                     url: `/api/outputs/${path.basename(sessionOutDir)}/${f}`,
-                    preview: `/api/outputs/${path.basename(sessionOutDir)}/${fileName}_page_${pageNum}.png`
+                    relPath: `${path.basename(sessionOutDir)}/${f}`,
+                    preview: `/api/outputs/${path.basename(sessionOutDir)}/${previewFile}`
                 };
             });
 
-        res.json({ files: resultFiles, mode: finalMode, debugStats });
+        res.json({ files: resultFiles, mode: finalMode, debugStats, split });
+
 
         // 5. Cleanup: delete uploaded PDF (non-blocking)
         const uploadSessionDir = path.dirname(pdfPath);
@@ -148,6 +149,16 @@ app.post('/api/convert', async (req, res) => {
         console.error(err);
         res.status(500).json({ error: err.message });
     }
+});
+
+app.get('/api/download', (req, res) => {
+    const { file, name } = req.query;
+    if (!file) return res.status(400).send('File missing');
+
+    const filePath = path.join(OUT_DIR, file);
+    if (!fs.existsSync(filePath)) return res.status(404).send('File not found');
+
+    res.download(filePath, name || path.basename(filePath));
 });
 
 // Proxy static assets for better control

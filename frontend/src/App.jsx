@@ -31,6 +31,7 @@ const App = () => {
   const [showWarning, setShowWarning] = useState(false);
   const [comparison, setComparison] = useState(null); // { tiffUrl, pdfUrl, previewUrl }
   const [dpi, setDpi] = useState(400); // 200, 300, 400, 600
+  const [split, setSplit] = useState(true); // true: page by page, false: single file
 
   const handleStartConvert = async (directPath = null) => {
     const p = directPath || pdfInfo?.path;
@@ -45,7 +46,8 @@ const App = () => {
       const res = await axios.post(`${API_BASE}/api/convert`, {
         pdfPath: p,
         mode: mode,
-        dpi: dpi
+        dpi: dpi,
+        split: split
       });
       setResults(res.data.files);
       setFinalMode(res.data.mode);
@@ -82,7 +84,7 @@ const App = () => {
     } catch (err) {
       setError("PDFの解析に失敗しました。");
     }
-  }, [mode, dpi]);
+  }, [mode, dpi, split]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -93,12 +95,11 @@ const App = () => {
     results.forEach((r, idx) => {
       setTimeout(() => {
         const link = document.createElement('a');
-        link.href = `${API_BASE}${r.url}`;
-        link.download = r.name;
+        link.href = `${API_BASE}/api/download?file=${encodeURIComponent(r.relPath)}&name=${encodeURIComponent(r.name)}`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-      }, idx * 300); // Small delay to avoid browser blocking multiple downloads
+      }, idx * 500); // Slightly more delay to avoid browser blocking
     });
   };
 
@@ -160,6 +161,28 @@ const App = () => {
                   <span style={{ fontSize: '14px' }}>{d} DPI</span>
                 </label>
               ))}
+            </div>
+          </div>
+          <div className="settings-group">
+            <Settings size={18} color="var(--text-muted)" />
+            <span className="settings-label">出力形式:</span>
+            <div className="radio-group">
+              <label className="radio-label">
+                <input
+                  type="radio"
+                  checked={split}
+                  onChange={() => setSplit(true)}
+                />
+                <span style={{ fontSize: '14px' }}>ページごとに分割</span>
+              </label>
+              <label className="radio-label">
+                <input
+                  type="radio"
+                  checked={!split}
+                  onChange={() => setSplit(false)}
+                />
+                <span style={{ fontSize: '14px' }}>1つのTIFFにまとめる</span>
+              </label>
             </div>
           </div>
         </div>
@@ -267,7 +290,10 @@ const App = () => {
                     >
                       <Eye size={16} />
                     </button>
-                    <a href={`${API_BASE}${r.url}`} download={r.name} style={{ color: 'var(--primary)' }}>
+                    <a
+                      href={`${API_BASE}/api/download?file=${encodeURIComponent(r.relPath)}&name=${encodeURIComponent(r.name)}`}
+                      style={{ color: 'var(--primary)' }}
+                    >
                       <Download size={16} />
                     </a>
                   </div>
