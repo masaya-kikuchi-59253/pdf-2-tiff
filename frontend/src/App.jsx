@@ -116,19 +116,11 @@ const App = () => {
       </div>
 
       <div className="glass-card">
-        <div className="settings-row" style={{
-          marginBottom: '20px',
-          borderBottom: '1px solid var(--border)',
-          paddingBottom: '20px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px',
-          paddingLeft: '40px' // Indent settings from the left
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'flex-start' }}>
+        <div className="settings-row">
+          <div className="settings-group">
             <Settings size={18} color="var(--text-muted)" />
-            <span style={{ fontWeight: 600, minWidth: '100px', textAlign: 'left' }}>カラー設定:</span>
-            <div className="radio-group" style={{ display: 'flex', gap: '12px' }}>
+            <span className="settings-label">カラー設定:</span>
+            <div className="radio-group">
               {['auto', 'color', 'bw'].map(m => (
                 <label key={m} className="radio-label">
                   <input
@@ -146,10 +138,10 @@ const App = () => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'flex-start' }}>
+          <div className="settings-group">
             <FileDigit size={18} color="var(--text-muted)" />
-            <span style={{ fontWeight: 600, minWidth: '100px', textAlign: 'left' }}>解像度 (DPI):</span>
-            <div className="radio-group" style={{ display: 'flex', gap: '12px' }}>
+            <span className="settings-label">解像度 (DPI):</span>
+            <div className="radio-group">
               {[200, 300, 400, 600].map(d => (
                 <label key={d} className="radio-label">
                   <input
@@ -163,7 +155,6 @@ const App = () => {
                 </label>
               ))}
             </div>
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginLeft: '10px' }}>※ 高DPIほどファイルサイズが大きくなります</span>
           </div>
         </div>
 

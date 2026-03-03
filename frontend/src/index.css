@@ -37,6 +37,8 @@ body {
   box-shadow: var(--shadow);
   padding: 24px;
   margin-bottom: 24px;
+  text-align: left;
+  /* Ensure left alignment by default */
 }
 
 .btn {
@@ -77,9 +79,25 @@ body {
 
 .settings-row {
   display: flex;
-  gap: 20px;
-  margin-top: 20px;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 20px;
+}
+
+.settings-group {
+  display: flex;
   align-items: center;
+  gap: 15px;
+  padding-left: 40px;
+  /* Indentation */
+}
+
+.settings-label {
+  font-weight: 600;
+  min-width: 100px;
+  color: var(--text-main);
 }
 
 .radio-group {
