@@ -29,6 +29,28 @@ const App = () => {
   const [showWarning, setShowWarning] = useState(false);
   const [comparison, setComparison] = useState(null); // { tiffUrl, pdfUrl, previewUrl }
 
+  const handleStartConvert = async (directPath = null) => {
+    const p = directPath || pdfInfo?.path;
+    if (!p) return;
+
+    setShowWarning(false);
+    setConverting(true);
+    setResults([]);
+    setError(null);
+
+    try {
+      const res = await axios.post(`${API_BASE}/api/convert`, {
+        pdfPath: p,
+        mode: mode
+      });
+      setResults(res.data.files);
+    } catch (err) {
+      setError("変換に失敗しました。Ghostscriptが正しく構成されているか確認してください。");
+    } finally {
+      setConverting(false);
+    }
+  };
+
   const onDrop = useCallback(async (acceptedFiles) => {
     const selectedFile = acceptedFiles[0];
     if (!selectedFile) return;
@@ -46,37 +68,19 @@ const App = () => {
       setPdfInfo(res.data);
       if (res.data.pages >= 10) {
         setShowWarning(true);
+      } else {
+        handleStartConvert(res.data.path);
       }
     } catch (err) {
       setError("PDFの解析に失敗しました。");
     }
-  }, []);
+  }, [mode]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: { 'application/pdf': ['.pdf'] },
     multiple: false
   });
-
-  const handleStartConvert = async () => {
-    setShowWarning(false);
-    setConverting(true);
-    setResults([]);
-    setError(null);
-
-    try {
-      const res = await axios.post(`${API_BASE}/api/convert`, {
-        pdfPath: pdfInfo.path,
-        mode: mode
-      });
-      setResults(res.data.files);
-    } catch (err) {
-      setError("変換に失敗しました。Ghostscriptが正しく構成されているか確認してください。");
-    } finally {
-      setConverting(false);
-    }
-  };
-
   const downloadAll = () => {
     results.forEach((r, idx) => {
       setTimeout(() => {
@@ -110,9 +114,38 @@ const App = () => {
       </div>
 
       <div className="glass-card">
+        <div className="settings-row" style={{ marginBottom: '20px', borderBottom: '1px solid var(--border)', paddingBottom: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Settings size={18} color="var(--text-muted)" />
+            <span style={{ fontWeight: 500 }}>カラー設定:</span>
+            <div className="radio-group">
+              {['auto', 'color', 'bw'].map(m => (
+                <label key={m} className="radio-label">
+                  <input
+                    type="radio"
+                    name="mode"
+                    value={m}
+                    checked={mode === m}
+                    onChange={() => setMode(m)}
+                  />
+                  <span style={{ fontSize: '14px', textTransform: 'capitalize' }}>
+                    {m === 'auto' ? '自動判定' : m === 'color' ? 'カラー' : '白黒'}
+                  </span>
+                </label>
+              ))}
+            </div>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginLeft: '10px' }}>(固定 400 DPI)</span>
+          </div>
+        </div>
+
         <div {...getRootProps()} className="upload-area">
           <input {...getInputProps()} />
-          {file ? (
+          {converting ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+              <Loader2 className="animate-spin" size={48} color="var(--primary)" />
+              <p style={{ fontSize: '16px', fontWeight: 500 }}>変換中...</p>
+            </div>
+          ) : file ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
               <FileDigit size={32} color="var(--primary)" />
               <div style={{ textAlign: 'left' }}>
@@ -129,41 +162,6 @@ const App = () => {
             </div>
           )}
         </div>
-
-        {pdfInfo && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="settings-row">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Settings size={18} color="var(--text-muted)" />
-              <span style={{ fontWeight: 500 }}>カラー設定:</span>
-              <div className="radio-group">
-                {['auto', 'color', 'bw'].map(m => (
-                  <label key={m} className="radio-label">
-                    <input
-                      type="radio"
-                      name="mode"
-                      value={m}
-                      checked={mode === m}
-                      onChange={() => setMode(m)}
-                    />
-                    <span style={{ fontSize: '14px', textTransform: 'capitalize' }}>
-                      {m === 'auto' ? '自動判別' : m === 'color' ? 'カラー' : '白黒'}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <button
-              className="btn btn-primary"
-              onClick={handleStartConvert}
-              disabled={converting}
-              style={{ marginLeft: 'auto' }}
-            >
-              {converting ? <Loader2 className="animate-spin" size={18} style={{ marginRight: '8px' }} /> : null}
-              {converting ? '変換中...' : '変換開始'}
-            </button>
-          </motion.div>
-        )}
       </div>
 
       <AnimatePresence>

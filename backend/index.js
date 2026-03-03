@@ -74,7 +74,7 @@ app.post('/api/convert', async (req, res) => {
         const outPattern = path.join(sessionOutDir, `${fileName}_page_%d.tif`);
         const pngPattern = path.join(sessionOutDir, `${fileName}_page_%d.png`);
 
-        const convertTiffCmd = `"${GS_PATH}" -dNOPAUSE -dBATCH -sDEVICE=${dev} -r300 -sOutputFile="${outPattern}" "${pdfPath}"`;
+        const convertTiffCmd = `"${GS_PATH}" -dNOPAUSE -dBATCH -sDEVICE=${dev} -r400 -sOutputFile="${outPattern}" "${pdfPath}"`;
         const convertPngCmd = `"${GS_PATH}" -dNOPAUSE -dBATCH -sDEVICE=png16m -r72 -sOutputFile="${pngPattern}" "${pdfPath}"`;
 
         await Promise.all([
