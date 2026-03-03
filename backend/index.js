@@ -63,9 +63,9 @@ app.post('/api/convert', async (req, res) => {
         let finalMode = mode;
         if (mode === 'auto') {
             const inkcovCmd = `"${GS_PATH}" -o - -sDEVICE=inkcov -dNOPAUSE -dBATCH "${pdfPath}"`;
-            const inkcovOutput = await execPromise(inkcovCmd);
+            const gsOutput = await execPromise(inkcovCmd);
 
-            const lines = inkcovOutput.split(/\r?\n/);
+            const lines = gsOutput.split(/\r?\n/);
             let hasColor = false;
             for (const line of lines) {
                 if (line.includes('CMYK OK')) {
@@ -74,8 +74,8 @@ app.post('/api/convert', async (req, res) => {
                         const cyan = parseFloat(values[0]);
                         const magenta = parseFloat(values[1]);
                         const yellow = parseFloat(values[2]);
-                        // 0.01% (0.0001) 以上であればカラーとみなす
-                        if (cyan > 0.0001 || magenta > 0.0001 || yellow > 0.0001) {
+                        // 閾値を 0.025 (2.5%) に引き上げ、さらに白黒判定を強固に
+                        if (cyan > 0.025 || magenta > 0.025 || yellow > 0.025) {
                             hasColor = true;
                             break;
                         }
@@ -168,7 +168,7 @@ function execPromise(cmd) {
     return new Promise((resolve, reject) => {
         exec(cmd, (err, stdout, stderr) => {
             if (err) return reject(err);
-            resolve(stdout);
+            resolve(stdout + stderr);
         });
     });
 }

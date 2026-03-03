@@ -124,7 +124,7 @@ const App = () => {
             <Settings size={18} color="var(--text-muted)" />
             <span className="settings-label">カラー設定:</span>
             <div className="radio-group">
-              {['auto', 'color', 'bw'].map(m => (
+              {['auto', 'bw', 'color'].map(m => (
                 <label key={m} className="radio-label">
                   <input
                     type="radio"
@@ -134,7 +134,7 @@ const App = () => {
                     onChange={() => setMode(m)}
                   />
                   <span style={{ fontSize: '14px' }}>
-                    {m === 'auto' ? '自動判定' : m === 'color' ? 'カラー' : '白黒'}
+                    {m === 'auto' ? '自動判定' : m === 'bw' ? '白黒' : 'カラー'}
                   </span>
                 </label>
               ))}
@@ -235,7 +235,6 @@ const App = () => {
                   gap: '6px'
                 }}>
                   {finalMode === 'color' ? '🎨 カラー ' : '⚫️ 白黒 '}
-                  {mode === 'auto' && <span style={{ fontWeight: 400, opacity: 0.8 }}>(自動判定)</span>}
                 </div>
               )}
             </div>
