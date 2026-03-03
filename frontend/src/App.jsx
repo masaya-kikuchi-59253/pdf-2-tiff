@@ -347,7 +347,7 @@ const App = () => {
       </div>
 
       <footer style={{ marginTop: 'auto', paddingTop: '40px', paddingBottom: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
-        &copy; 2026 Ghostscript PDF-2-TIFF Converter | Windows Server Ready
+        &copy; 2026 PDF-2-TIFF Converter Contributors | MIT Licensed
       </footer>
 
       <style>{`
