@@ -28,6 +28,7 @@ const App = () => {
   const [error, setError] = useState(null);
   const [showWarning, setShowWarning] = useState(false);
   const [comparison, setComparison] = useState(null); // { tiffUrl, pdfUrl, previewUrl }
+  const [dpi, setDpi] = useState(400); // 200, 300, 400, 600
 
   const handleStartConvert = async (directPath = null) => {
     const p = directPath || pdfInfo?.path;
@@ -41,7 +42,8 @@ const App = () => {
     try {
       const res = await axios.post(`${API_BASE}/api/convert`, {
         pdfPath: p,
-        mode: mode
+        mode: mode,
+        dpi: dpi
       });
       setResults(res.data.files);
     } catch (err) {
@@ -74,7 +76,7 @@ const App = () => {
     } catch (err) {
       setError("PDFの解析に失敗しました。");
     }
-  }, [mode]);
+  }, [mode, dpi]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -114,11 +116,19 @@ const App = () => {
       </div>
 
       <div className="glass-card">
-        <div className="settings-row" style={{ marginBottom: '20px', borderBottom: '1px solid var(--border)', paddingBottom: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div className="settings-row" style={{
+          marginBottom: '20px',
+          borderBottom: '1px solid var(--border)',
+          paddingBottom: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+          paddingLeft: '40px' // Indent settings from the left
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'flex-start' }}>
             <Settings size={18} color="var(--text-muted)" />
-            <span style={{ fontWeight: 500 }}>カラー設定:</span>
-            <div className="radio-group">
+            <span style={{ fontWeight: 600, minWidth: '100px', textAlign: 'left' }}>カラー設定:</span>
+            <div className="radio-group" style={{ display: 'flex', gap: '12px' }}>
               {['auto', 'color', 'bw'].map(m => (
                 <label key={m} className="radio-label">
                   <input
@@ -128,13 +138,32 @@ const App = () => {
                     checked={mode === m}
                     onChange={() => setMode(m)}
                   />
-                  <span style={{ fontSize: '14px', textTransform: 'capitalize' }}>
+                  <span style={{ fontSize: '14px' }}>
                     {m === 'auto' ? '自動判定' : m === 'color' ? 'カラー' : '白黒'}
                   </span>
                 </label>
               ))}
             </div>
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginLeft: '10px' }}>(固定 400 DPI)</span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'flex-start' }}>
+            <FileDigit size={18} color="var(--text-muted)" />
+            <span style={{ fontWeight: 600, minWidth: '100px', textAlign: 'left' }}>解像度 (DPI):</span>
+            <div className="radio-group" style={{ display: 'flex', gap: '12px' }}>
+              {[200, 300, 400, 600].map(d => (
+                <label key={d} className="radio-label">
+                  <input
+                    type="radio"
+                    name="dpi"
+                    value={d}
+                    checked={dpi === d}
+                    onChange={() => setDpi(d)}
+                  />
+                  <span style={{ fontSize: '14px' }}>{d} DPI</span>
+                </label>
+              ))}
+            </div>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginLeft: '10px' }}>※ 高DPIほどファイルサイズが大きくなります</span>
           </div>
         </div>
 
