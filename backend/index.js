@@ -64,7 +64,24 @@ app.post('/api/convert', async (req, res) => {
         if (mode === 'auto') {
             const inkcovCmd = `"${GS_PATH}" -o - -sDEVICE=inkcov -dNOPAUSE -dBATCH "${pdfPath}"`;
             const inkcovOutput = await execPromise(inkcovCmd);
-            const hasColor = /([1-9]\d*\.\d+|0\.[0-9]*[1-9][0-9]*)\s+([1-9]\d*\.\d+|0\.[0-9]*[1-9][0-9]*)\s+([1-9]\d*\.\d+|0\.[0-9]*[1-9][0-9]*)/.test(inkcovOutput);
+
+            const lines = inkcovOutput.split(/\r?\n/);
+            let hasColor = false;
+            for (const line of lines) {
+                if (line.includes('CMYK OK')) {
+                    const values = line.trim().split(/\s+/);
+                    if (values.length >= 3) {
+                        const cyan = parseFloat(values[0]);
+                        const magenta = parseFloat(values[1]);
+                        const yellow = parseFloat(values[2]);
+                        // 0.01% (0.0001) 以上であればカラーとみなす
+                        if (cyan > 0.0001 || magenta > 0.0001 || yellow > 0.0001) {
+                            hasColor = true;
+                            break;
+                        }
+                    }
+                }
+            }
             finalMode = hasColor ? 'color' : 'bw';
         }
 
