@@ -25,6 +25,7 @@ const App = () => {
   const [mode, setMode] = useState('auto'); // auto, color, bw
   const [converting, setConverting] = useState(false);
   const [results, setResults] = useState([]);
+  const [finalMode, setFinalMode] = useState(null);
   const [error, setError] = useState(null);
   const [showWarning, setShowWarning] = useState(false);
   const [comparison, setComparison] = useState(null); // { tiffUrl, pdfUrl, previewUrl }
@@ -46,6 +47,7 @@ const App = () => {
         dpi: dpi
       });
       setResults(res.data.files);
+      setFinalMode(res.data.mode);
     } catch (err) {
       setError("変換に失敗しました。Ghostscriptが正しく構成されているか確認してください。");
     } finally {
@@ -60,6 +62,7 @@ const App = () => {
     setFile(selectedFile);
     setPdfInfo(null);
     setResults([]);
+    setFinalMode(null);
     setError(null);
 
     const formData = new FormData();
@@ -217,7 +220,25 @@ const App = () => {
       {results.length > 0 && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h2 style={{ fontSize: '18px' }}>変換結果 ({results.length} ファイル)</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+              <h2 style={{ fontSize: '18px' }}>変換結果 ({results.length} ファイル)</h2>
+              {finalMode && (
+                <div style={{
+                  background: finalMode === 'color' ? '#fee2e2' : '#f1f5f9',
+                  color: finalMode === 'color' ? '#991b1b' : '#334155',
+                  padding: '4px 12px',
+                  borderRadius: '20px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  {finalMode === 'color' ? '🎨 カラー ' : '⚫️ 白黒 '}
+                  {mode === 'auto' && <span style={{ fontWeight: 400, opacity: 0.8 }}>(自動判定)</span>}
+                </div>
+              )}
+            </div>
             <button className="btn btn-primary" onClick={downloadAll}>
               <Download size={18} style={{ marginRight: '8px' }} /> 一括ダウンロード
             </button>
