@@ -60,7 +60,7 @@ app.post('/api/convert', async (req, res) => {
         fs.ensureDirSync(sessionOutDir);
 
         // 1. Determine mode if auto
-        let finalMode = mode;
+        let debugStats = [];
         if (mode === 'auto') {
             const inkcovCmd = `"${GS_PATH}" -o - -sDEVICE=inkcov -dNOPAUSE -dBATCH "${pdfPath}"`;
             const gsOutput = await execPromise(inkcovCmd);
@@ -74,10 +74,10 @@ app.post('/api/convert', async (req, res) => {
                         const cyan = parseFloat(values[0]);
                         const magenta = parseFloat(values[1]);
                         const yellow = parseFloat(values[2]);
-                        // 閾値を 0.025 (2.5%) に引き上げ、さらに白黒判定を強固に
-                        if (cyan > 0.025 || magenta > 0.025 || yellow > 0.025) {
+                        debugStats.push({ cyan, magenta, yellow });
+                        // 閾値を 0.1 (10%) に引き上げ、より確実に白黒判定を行う
+                        if (cyan > 0.1 || magenta > 0.1 || yellow > 0.1) {
                             hasColor = true;
-                            break;
                         }
                     }
                 }
@@ -138,7 +138,7 @@ app.post('/api/convert', async (req, res) => {
                 };
             });
 
-        res.json({ files: resultFiles, mode: finalMode });
+        res.json({ files: resultFiles, mode: finalMode, debugStats });
 
         // 5. Cleanup: delete uploaded PDF (non-blocking)
         const uploadSessionDir = path.dirname(pdfPath);
