@@ -110,17 +110,7 @@ const App = () => {
         <p style={{ color: 'var(--text-muted)' }}>Ghostscript Powered | Smooth Workflow</p>
       </header>
 
-      <div className="security-notice">
-        <ShieldCheck size={18} />
-        <div>
-          <strong>社内で安全にご利用いただけます</strong>
-          <ul>
-            <li>本サービスは社内ネットワーク内で完結しており、データが社外に出ることはありません。</li>
-            <li>アップロードされた PDF は変換後すぐにサーバーから自動削除されます。</li>
-            <li>変換後の TIFF も一定時間後に自動クリーンアップされます。</li>
-          </ul>
-        </div>
-      </div>
+
 
       <div className="glass-card">
         <div className="settings-row">
@@ -343,6 +333,18 @@ const App = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <div className="security-notice" style={{ marginTop: '40px' }}>
+        <ShieldCheck size={18} />
+        <div>
+          <strong>社内で安全にご利用いただけます</strong>
+          <ul>
+            <li>本サービスは社内ネットワーク内で完結しており、データが社外に出ることはありません。</li>
+            <li>アップロードされた PDF は変換後すぐにサーバーから自動削除されます。</li>
+            <li>変換後の TIFF も一定時間後に自動クリーンアップされます。</li>
+          </ul>
+        </div>
+      </div>
 
       <footer style={{ marginTop: 'auto', paddingTop: '40px', paddingBottom: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
         &copy; 2026 Ghostscript PDF-2-TIFF Converter | Windows Server Ready
