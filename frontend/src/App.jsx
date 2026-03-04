@@ -96,6 +96,7 @@ const App = () => {
       setTimeout(() => {
         const link = document.createElement('a');
         link.href = `${API_BASE}/api/download?file=${encodeURIComponent(r.relPath)}&name=${encodeURIComponent(r.name)}`;
+        link.download = r.name;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -282,6 +283,7 @@ const App = () => {
                     </button>
                     <a
                       href={`${API_BASE}/api/download?file=${encodeURIComponent(r.relPath)}&name=${encodeURIComponent(r.name)}`}
+                      download={r.name}
                       style={{ color: 'var(--primary)' }}
                     >
                       <Download size={16} />

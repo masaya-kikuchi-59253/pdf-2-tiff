@@ -11,6 +11,17 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const GS_PATH = process.env.GS_PATH || 'gswin64c';
 
+function normalizeUploadedFilename(name = '') {
+    if (!name) return 'upload.pdf';
+
+    const looksMojibake = /Ã.|â|ã|�/.test(name);
+    const decoded = looksMojibake ? Buffer.from(name, 'latin1').toString('utf8') : name;
+
+    return decoded
+        .normalize('NFC')
+        .replace(/[\\/:*?"<>|]/g, '_');
+}
+
 app.use(cors());
 app.use(express.json());
 
@@ -27,7 +38,9 @@ const storage = multer.diskStorage({
         cb(null, sessionDir);
     },
     filename: (req, file, cb) => {
-        cb(null, file.originalname);
+        const normalized = normalizeUploadedFilename(file.originalname);
+        file.originalname = normalized;
+        cb(null, normalized);
     }
 });
 
@@ -45,7 +58,7 @@ app.post('/api/pdf-info', upload.single('pdf'), async (req, res) => {
         const data = await fs.readFile(pdfPath);
         const pdfDoc = await PDFDocument.load(data);
         const pages = pdfDoc.getPageCount();
-        res.json({ pages, filename: req.file.originalname, path: pdfPath });
+        res.json({ pages, filename: normalizeUploadedFilename(req.file.originalname), path: pdfPath });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -93,7 +106,8 @@ app.post('/api/convert', async (req, res) => {
         const pngPattern = path.join(sessionOutDir, `${fileName}_page_%d.png`);
 
         const convertTiffCmd = `"${GS_PATH}" -dNOPAUSE -dBATCH -sDEVICE=${dev} -r${resolution} -sOutputFile="${outPattern}" "${pdfPath}"`;
-        const convertPngCmd = `"${GS_PATH}" -dNOPAUSE -dBATCH -sDEVICE=png16m -r72 -sOutputFile="${pngPattern}" "${pdfPath}"`;
+        const previewDevice = finalMode === 'color' ? 'png16m' : 'pnggray';
+        const convertPngCmd = `"${GS_PATH}" -dNOPAUSE -dBATCH -sDEVICE=${previewDevice} -r72 -sOutputFile="${pngPattern}" "${pdfPath}"`;
 
         await Promise.all([
             execPromise(convertTiffCmd),
@@ -158,7 +172,8 @@ app.get('/api/download', (req, res) => {
     const filePath = path.join(OUT_DIR, file);
     if (!fs.existsSync(filePath)) return res.status(404).send('File not found');
 
-    res.download(filePath, name || path.basename(filePath));
+    const downloadName = normalizeUploadedFilename(name || path.basename(filePath));
+    res.download(filePath, downloadName);
 });
 
 // Proxy static assets for better control
