@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useDropzone } from 'react-dropzone';
 import {
@@ -62,6 +62,63 @@ const App = () => {
   const [suffix, setSuffix] = useState('');
   const [pageAtEnd, setPageAtEnd] = useState(true);
   const [extension, setExtension] = useState('tiff');
+
+  const [allPresets, setAllPresets] = useState([]);
+  const [defaultEditable, setDefaultEditable] = useState(['mode', 'suffix']);
+  const [currentPresetId, setCurrentPresetId] = useState(null);
+
+  const applyPreset = (preset) => {
+    if (!preset) return;
+    const o = preset.options || {};
+    if (o.mode !== undefined) setMode(o.mode);
+    if (o.dpi !== undefined) setDpi(o.dpi);
+    if (o.split !== undefined) setSplit(o.split);
+    if (o.digitOnly !== undefined) setDigitOnly(o.digitOnly);
+    if (o.suffixEnabled !== undefined) setSuffixEnabled(o.suffixEnabled);
+    if (o.suffix !== undefined) setSuffix(o.suffix);
+    if (o.pageAtEnd !== undefined) setPageAtEnd(o.pageAtEnd);
+    if (o.extension !== undefined) setExtension(o.extension);
+    setCurrentPresetId(preset.id);
+  };
+
+  useEffect(() => {
+    axios.get(`${API_BASE}/api/presets`).then(res => {
+      const all = res.data?.presets || [];
+      setAllPresets(all);
+      setDefaultEditable(res.data?.defaultEditable || ['mode', 'suffix']);
+
+      const urlPreset = new URLSearchParams(window.location.search).get('preset');
+      const configDefault = res.data?.defaultPreset ?? null;
+      const target = urlPreset ?? configDefault;
+
+      if (target === '__custom__') return;  // explicitly start in custom mode
+      const initial = target
+        ? all.find(p => p.id === target)
+        : all.find(p => !p.hidden);
+      if (initial) applyPreset(initial);
+    }).catch(() => { /* presets unavailable — continue with custom-only UI */ });
+  }, []);
+
+  const visiblePresets = allPresets.filter(p => !p.hidden);
+  const activePreset = currentPresetId ? allPresets.find(p => p.id === currentPresetId) : null;
+  const editableFields = activePreset ? (activePreset.editable ?? defaultEditable) : null;
+  const isLocked = (field) => {
+    if (editableFields === null) return false;        // custom mode (no preset)
+    if (editableFields === '*') return false;         // wildcard: all editable
+    return !editableFields.includes(field);
+  };
+
+  const PRESET_RADIO_THRESHOLD = 5;
+  const usePresetRadio = visiblePresets.length > 0 && visiblePresets.length <= PRESET_RADIO_THRESHOLD;
+
+  const onSelectPreset = (value) => {
+    if (value === '__custom__') {
+      setCurrentPresetId(null);
+    } else {
+      applyPreset(allPresets.find(p => p.id === value));
+    }
+  };
+  const currentPresetValue = currentPresetId ?? '__custom__';
 
   const handleStartConvert = async (directPath = null) => {
     const p = directPath || pdfInfo?.path;
@@ -153,125 +210,124 @@ const App = () => {
 
       <div className="glass-card">
         <div className="settings-row">
+          {visiblePresets.length > 0 && (
+            <div className="settings-group">
+              <Settings size={18} color="var(--text-muted)" />
+              <span className="settings-label">プリセット:</span>
+              {usePresetRadio ? (
+                <SegmentedControl
+                  name="preset"
+                  value={currentPresetValue}
+                  onChange={onSelectPreset}
+                  options={[
+                    ...visiblePresets.map(p => ({ value: p.id, label: p.label })),
+                    ...(activePreset && activePreset.hidden ? [{ value: activePreset.id, label: activePreset.label }] : []),
+                    { value: '__custom__', label: 'カスタム' },
+                  ]}
+                />
+              ) : (
+                <select
+                  className="preset-select"
+                  value={currentPresetValue}
+                  onChange={e => onSelectPreset(e.target.value)}
+                >
+                  {visiblePresets.map(p => (
+                    <option key={p.id} value={p.id}>{p.label}</option>
+                  ))}
+                  {activePreset && activePreset.hidden && (
+                    <option value={activePreset.id}>{activePreset.label}</option>
+                  )}
+                  <option value="__custom__">カスタム</option>
+                </select>
+              )}
+            </div>
+          )}
+
           <div className="settings-group">
             <Settings size={18} color="var(--text-muted)" />
             <span className="settings-label">カラー設定:</span>
-            <div className="radio-group">
-              {['auto', 'bw', 'color'].map(m => (
-                <label key={m} className="radio-label">
-                  <input
-                    type="radio"
-                    name="mode"
-                    value={m}
-                    checked={mode === m}
-                    onChange={() => setMode(m)}
-                  />
-                  <span style={{ fontSize: '14px' }}>
-                    {m === 'auto' ? '自動判定' : m === 'bw' ? '白黒' : 'カラー'}
-                  </span>
-                </label>
-              ))}
-            </div>
+            <SegmentedControl
+              name="mode"
+              value={mode}
+              onChange={setMode}
+              disabled={isLocked('mode')}
+              options={[
+                { value: 'auto',  label: '自動判定' },
+                { value: 'bw',    label: '白黒' },
+                { value: 'color', label: 'カラー' },
+              ]}
+            />
           </div>
 
           <div className="settings-group">
             <FileDigit size={18} color="var(--text-muted)" />
             <span className="settings-label">解像度 (DPI):</span>
-            <div className="radio-group">
-              {[200, 300, 400, 600].map(d => (
-                <label key={d} className="radio-label">
-                  <input
-                    type="radio"
-                    name="dpi"
-                    value={d}
-                    checked={dpi === d}
-                    onChange={() => setDpi(d)}
-                  />
-                  <span style={{ fontSize: '14px' }}>{d} DPI</span>
-                </label>
-              ))}
-            </div>
+            <SegmentedControl
+              name="dpi"
+              value={dpi}
+              onChange={v => setDpi(Number(v))}
+              disabled={isLocked('dpi')}
+              options={[
+                { value: 200, label: '200 DPI' },
+                { value: 300, label: '300 DPI' },
+                { value: 400, label: '400 DPI' },
+                { value: 600, label: '600 DPI' },
+              ]}
+            />
           </div>
           <div className="settings-group">
             <Settings size={18} color="var(--text-muted)" />
             <span className="settings-label">出力形式:</span>
-            <div className="radio-group">
-              <label className="radio-label">
-                <input
-                  type="radio"
-                  checked={split}
-                  onChange={() => setSplit(true)}
-                />
-                <span style={{ fontSize: '14px' }}>ページごとに分割</span>
-              </label>
-              <label className="radio-label">
-                <input
-                  type="radio"
-                  checked={!split}
-                  onChange={() => setSplit(false)}
-                />
-                <span style={{ fontSize: '14px' }}>1つのTIFFにまとめる</span>
-              </label>
-            </div>
+            <SegmentedControl
+              name="split"
+              value={split}
+              onChange={v => setSplit(v === 'true' || v === true)}
+              disabled={isLocked('split')}
+              options={[
+                { value: true,  label: 'ページごとに分割' },
+                { value: false, label: '1つのTIFFにまとめる' },
+              ]}
+            />
           </div>
 
           <div className="settings-group" style={{ alignItems: 'flex-start' }}>
             <Settings size={18} color="var(--text-muted)" style={{ marginTop: '2px' }} />
             <span className="settings-label" style={{ lineHeight: 1, marginTop: '3px' }}>ファイル名:</span>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <label className="radio-label">
-                <input
-                  type="checkbox"
-                  checked={digitOnly}
-                  onChange={e => setDigitOnly(e.target.checked)}
-                />
-                <span style={{ fontSize: '14px' }}>数字と "_" のみにする</span>
-              </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minHeight: '28px' }}>
-                <label className="radio-label">
-                  <input
-                    type="checkbox"
-                    checked={suffixEnabled}
-                    onChange={e => setSuffixEnabled(e.target.checked)}
-                  />
-                  <span style={{ fontSize: '14px' }}>suffix を付ける</span>
-                </label>
+              <ToggleSwitch
+                checked={digitOnly}
+                onChange={setDigitOnly}
+                disabled={isLocked('digitOnly')}
+              >
+                数字と "_" のみにする
+              </ToggleSwitch>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', minHeight: '28px' }}>
+                <ToggleSwitch
+                  checked={suffixEnabled}
+                  onChange={setSuffixEnabled}
+                  disabled={isLocked('suffixEnabled')}
+                >
+                  suffix を付ける:
+                </ToggleSwitch>
                 {suffixEnabled && (
                   <input
                     type="text"
                     value={suffix}
                     onChange={e => setSuffix(e.target.value)}
+                    disabled={isLocked('suffix')}
                     placeholder="例: 1, v2, rev3"
-                    style={{
-                      fontSize: '13px',
-                      padding: '3px 8px',
-                      border: '1px solid var(--border)',
-                      borderRadius: '6px',
-                      width: '130px',
-                    }}
+                    className="text-field"
                   />
                 )}
               </div>
               {suffixEnabled && split && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: '32px' }}>
-                  <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>suffix の位置:</span>
-                  <label className="radio-label">
-                    <input
-                      type="radio"
-                      checked={pageAtEnd}
-                      onChange={() => setPageAtEnd(true)}
-                    />
-                    <span style={{ fontSize: '13px' }}>ページ番号の前</span>
-                  </label>
-                  <label className="radio-label">
-                    <input
-                      type="radio"
-                      checked={!pageAtEnd}
-                      onChange={() => setPageAtEnd(false)}
-                    />
-                    <span style={{ fontSize: '13px' }}>ページ番号の後</span>
-                  </label>
-                </div>
+                <ToggleSwitch
+                  checked={!pageAtEnd}
+                  onChange={v => setPageAtEnd(!v)}
+                  disabled={isLocked('pageAtEnd')}
+                >
+                  suffix をページ番号の後に付ける
+                </ToggleSwitch>
               )}
             </div>
           </div>
@@ -279,18 +335,16 @@ const App = () => {
           <div className="settings-group">
             <Settings size={18} color="var(--text-muted)" />
             <span className="settings-label">拡張子:</span>
-            <div className="radio-group">
-              {['.tiff', '.tif'].map(ext => (
-                <label key={ext} className="radio-label">
-                  <input
-                    type="radio"
-                    checked={extension === ext.slice(1)}
-                    onChange={() => setExtension(ext.slice(1))}
-                  />
-                  <span style={{ fontSize: '14px' }}>{ext}</span>
-                </label>
-              ))}
-            </div>
+            <SegmentedControl
+              name="extension"
+              value={extension}
+              onChange={setExtension}
+              disabled={isLocked('extension')}
+              options={[
+                { value: 'tiff', label: '.tiff' },
+                { value: 'tif',  label: '.tif' },
+              ]}
+            />
           </div>
         </div>
 
@@ -480,5 +534,46 @@ const App = () => {
     </div>
   );
 };
+
+const SegmentedControl = ({ name, value, onChange, options, disabled }) => {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!ref.current) return;
+    const labels = ref.current.querySelectorAll('label');
+    let max = 0;
+    labels.forEach(l => { l.style.minWidth = ''; max = Math.max(max, l.offsetWidth); });
+    labels.forEach(l => { l.style.minWidth = `${max}px`; });
+  }, [options]);
+  return (
+    <div className="segmented" ref={ref} role="radiogroup">
+      {options.map(o => (
+        <label key={String(o.value)}>
+          <input
+            type="radio"
+            name={name}
+            value={String(o.value)}
+            checked={String(value) === String(o.value)}
+            onChange={() => onChange(o.value)}
+            disabled={disabled}
+          />
+          <span>{o.label}</span>
+        </label>
+      ))}
+    </div>
+  );
+};
+
+const ToggleSwitch = ({ checked, onChange, disabled, children }) => (
+  <label className="switch">
+    <input
+      type="checkbox"
+      checked={checked}
+      onChange={e => onChange(e.target.checked)}
+      disabled={disabled}
+    />
+    <span className="switch-knob" />
+    <span>{children}</span>
+  </label>
+);
 
 export default App;

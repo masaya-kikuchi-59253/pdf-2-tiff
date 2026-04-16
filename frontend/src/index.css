@@ -78,25 +78,27 @@ body {
 }
 
 .settings-row {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: 18px 120px 1fr;
+  gap: 16px 15px;
   margin-bottom: 20px;
   border-bottom: 1px solid var(--border);
   padding-bottom: 20px;
+  padding-left: 40px;
 }
 
 .settings-group {
-  display: flex;
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
-  gap: 15px;
-  padding-left: 40px;
-  /* Indentation */
+  justify-items: start;
 }
 
 .settings-label {
   font-weight: 600;
-  min-width: 100px;
+  width: 120px;
+  flex-shrink: 0;
   color: var(--text-main);
 }
 
@@ -110,6 +112,36 @@ body {
   align-items: center;
   gap: 6px;
   cursor: pointer;
+}
+
+.radio-label:has(input:disabled) {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.radio-label input:disabled {
+  cursor: not-allowed;
+}
+
+input[type="text"]:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: #f1f5f9;
+}
+
+.preset-select {
+  font-size: 14px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  min-width: 220px;
+}
+
+.preset-select:focus {
+  outline: none;
+  border-color: var(--primary);
 }
 
 .result-list {
@@ -222,4 +254,128 @@ body {
 
 .security-notice li {
   margin-bottom: 2px;
+}
+
+/* Segmented control (outlined variant) */
+.segmented {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  background: #e9edf2;
+  border-radius: 8px;
+  padding: 0;
+  border: 1px solid #e9edf2;
+  gap: 2px;
+}
+.segmented label {
+  position: relative;
+  padding: 5px 14px;
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--text-muted);
+  background: #e9edf2;
+  user-select: none;
+  text-align: center;
+  min-width: 6em;
+  border: 1.5px solid transparent;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.segmented label input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.segmented label:has(input:checked) {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+  font-weight: 600;
+}
+.segmented label:hover:not(:has(input:checked)):not(:has(input:disabled)) {
+  background: #f8fafc;
+  color: var(--text-main);
+}
+.segmented label:has(input:disabled) {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.segmented label + label::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 25%;
+  bottom: 25%;
+  width: 1px;
+  background: rgba(71, 85, 105, 0.28);
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+.segmented label:has(input:checked)::before,
+.segmented label:has(input:checked) + label::before {
+  opacity: 0;
+}
+
+/* Toggle switch */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 14px;
+}
+.switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.switch-knob {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  background: #cbd5e1;
+  border-radius: 999px;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.switch-knob::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: white;
+  border-radius: 999px;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
+  transition: transform 0.2s;
+}
+.switch input:checked + .switch-knob { background: var(--primary); }
+.switch input:checked + .switch-knob::after { transform: translateX(16px); }
+.switch:has(input:disabled) { opacity: 0.3; cursor: not-allowed; }
+
+/* Text field (Material filled style) */
+.text-field {
+  font-size: 13px;
+  padding: 6px 10px;
+  width: 130px;
+  background: #fefce8;
+  border: none;
+  border-bottom: 2px solid var(--primary);
+  border-radius: 0;
+  outline: none;
+  cursor: text;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.text-field:hover {
+  box-shadow: 0 2px 0 0 var(--primary);
+}
+.text-field:focus {
+  border-bottom-color: var(--primary-hover);
+  box-shadow: 0 2px 0 0 var(--primary-hover);
+}
+.text-field:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  background: #f1f5f9;
 }
