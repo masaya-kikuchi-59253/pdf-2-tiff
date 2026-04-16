@@ -11,6 +11,9 @@ backend/outputs/
 # Environment
 backend/.env
 
+# Server-specific preset config (use presets.example.yaml as template)
+backend/presets.yaml
+
 # OS
 Thumbs.db
 Desktop.ini

@@ -1,0 +1,72 @@
+# PDF-to-TIFF Converter — preset definitions
+#
+# このファイルを presets.yaml にコピーして、サーバーごとに自由にカスタマイズしてください。
+# presets.yaml は .gitignore 済みです。
+# 編集後は再起動不要（リロードのたびにファイルを読み直します）。
+
+# 起動時に選択されるプリセット ID。省略時は「最初の visible プリセット」。
+# '__custom__' を指定すると起動時カスタムモードになる。隠しプリセットも指定可能。
+# defaultPreset: standard
+
+# プリセット選択中でも編集可とするフィールドのデフォルト。
+# 各プリセットの editable で個別に上書き可能。
+defaultEditable:
+  - mode      # カラー設定（auto / bw / color）
+  - suffix    # suffix テキスト値（suffixEnabled の ON/OFF は含まない）
+
+presets:
+  - id: standard
+    label: 標準スキャン (400 DPI 白黒)
+    # hidden: false           # 省略時 false。true にすると dropdown に出ない（?preset=<id> でのみアクセス可）
+    # editable: [mode, suffix]  # 省略時は defaultEditable
+    options:
+      mode: bw                 # auto | bw | color
+      dpi: 400                 # 200 | 300 | 400 | 600
+      split: true              # true: ページごと分割 / false: 1 ファイルにまとめる
+      digitOnly: true          # ファイル名を数字と "_" のみに
+      suffixEnabled: false
+      suffix: ''
+      pageAtEnd: true          # true: ページ番号の前に suffix / false: 後に suffix
+      extension: tiff          # tiff | tif
+
+  - id: hires-color
+    label: 高解像度カラー (600 DPI)
+    options:
+      mode: color
+      dpi: 600
+      split: true
+      digitOnly: false
+      suffixEnabled: true
+      suffix: hires
+      pageAtEnd: true
+      extension: tiff
+
+  - id: legacy-internal
+    label: 旧システム取り込み用
+    hidden: true               # UI には出ず ?preset=legacy-internal で直接アクセス
+    editable: [mode]           # suffix も編集不可にする例
+    options:
+      mode: bw
+      dpi: 200
+      split: false
+      digitOnly: true
+      suffixEnabled: true
+      suffix: legacy
+      pageAtEnd: false
+      extension: tif
+
+  # 「組み込みカスタム（自由設定）の代わりに、自分で初期値を決めた自由設定枠を先頭に置きたい」場合の例。
+  # editable: '*' で全フィールド編集可（プリセット選択中でも全項目自由に変更可能）。
+  # defaultPreset: free と組み合わせると起動時にこのプリセットが選ばれる。
+  # - id: free
+  #   label: 自由設定
+  #   editable: '*'
+  #   options:
+  #     mode: auto
+  #     dpi: 400
+  #     split: true
+  #     digitOnly: false
+  #     suffixEnabled: false
+  #     suffix: ''
+  #     pageAtEnd: true
+  #     extension: tiff

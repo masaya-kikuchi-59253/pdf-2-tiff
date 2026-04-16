@@ -227,6 +227,56 @@ dev.bat
 
 `backend/.env` ファイルで設定できます。
 
+## プリセット機能（任意）
+
+頻繁に使う変換オプションの組み合わせを、サーバー管理者が「プリセット」として登録できます。
+各サーバー（部署・拠点）ごとに固有のワークフローを反映できるようにするため、プリセット定義はリポジトリには含めず、サーバーローカルの YAML ファイルで管理します。
+
+### セットアップ
+
+```bat
+:: 同梱のサンプルをコピーして編集
+copy backend\presets.example.yaml backend\presets.yaml
+notepad backend\presets.yaml
+```
+
+`backend/presets.yaml` を作成・編集すると、UI 上部に「プリセット」ドロップダウンが表示されます。
+ファイルを置かない場合はドロップダウンは出ず、これまで通り全オプション自由設定の UI になります。
+編集後の再起動は不要です（リクエストのたびに読み直します）。
+
+### YAML フォーマット概要
+
+```yaml
+# defaultPreset: standard         # 起動時の選択プリセット ID（省略時は最初の visible / '__custom__' でカスタム起動）
+defaultEditable: [mode, suffix]   # プリセット選択中でも編集可とするフィールドのデフォルト
+
+presets:
+  - id: standard                  # 内部 ID（URL パラメータでも使用）
+    label: 標準スキャン (400 DPI 白黒)  # UI 表示名（自由に命名可能）
+    # hidden: false               # true にすると UI に出ない（?preset=<id> でのみアクセス可）
+    # editable: [mode, suffix]    # このプリセット固有の編集可能フィールド（省略時 defaultEditable）
+    options:
+      mode: bw                    # auto | bw | color
+      dpi: 400                    # 200 | 300 | 400 | 600
+      split: true
+      digitOnly: true
+      suffixEnabled: false
+      suffix: ''
+      pageAtEnd: true
+      extension: tiff             # tiff | tif
+```
+
+完全な例は `backend/presets.example.yaml` を参照してください。
+
+### 動作仕様
+
+- **デフォルト編集可フィールド**: カラー設定 (`mode`) と suffix テキスト (`suffix`) のみ。それ以外はプリセット選択中はロック（disabled 表示）されます。
+- **編集可フィールドのカスタマイズ**: 各プリセットに `editable: [...]` を書くとそのプリセット固有の許可リストになります。`editable: '*'` で全フィールド編集可（カスタム同様の自由度になりますが、初期値は yaml で指定可能）。
+- **隠しプリセット**: `hidden: true` のプリセットは UI に出ませんが、`?preset=<id>` を URL に付けて直接アクセス可能です。特定の URL でブックマーク運用する用途に。
+- **カスタムモード**: 末尾の「カスタム（自由設定）」を選ぶと全オプションが編集可能になります。プリセット ↔ カスタムを切り替えても現在表示中の値は維持されます（プリセットの値で上書きされるのは「プリセットを選択した瞬間」のみ）。
+- **初期表示**: `defaultPreset` で指定したプリセット → URL の `?preset=<id>` → 最初の visible プリセット、の優先順で初期選択されます。`defaultPreset: __custom__` でカスタムモード起動。
+- **UI 表示形式の自動切替**: visible プリセット数が **5 個以下ならラジオボタン**（一目で選択肢が見える）、**6 個以上なら dropdown**（省スペース）に自動で切り替わります。
+
 ## Security
 
 本サービスはセキュリティに配慮した設計となっています。
