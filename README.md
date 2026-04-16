@@ -25,13 +25,14 @@ Ghostscript を利用して PDF を高品質 TIFF（300 DPI）に変換する We
 | **Node.js** (LTS推奨) | バックエンド実行 | `node -v` |
 | **Git** | ソースコード取得 | `git --version` |
 | **Ghostscript** (64bit) | PDF→TIFF 変換エンジン | `gswin64c --version` |
+| **[NSSM](https://nssm.cc/)** | バックエンドの自動起動（Windows サービス化） | `nssm version` |
 
 > Ghostscript が PATH に通っていない場合は、`backend/.env` を作成して `GS_PATH=C:\Program Files\gs\gs10.x\bin\gswin64c.exe` のようにフルパスを指定してください。
 
 ### 2. ソースコードの取得と依存関係のインストール
 
 ```bat
-cd C:\inetpub
+cd C:\
 git clone https://github.com/masaya-kikuchi-59253/pdf-2-tiff.git
 cd pdf-2-tiff
 
@@ -63,18 +64,19 @@ prod.bat
 #### 方法 B: バックグラウンドサービス化（本番推奨）
 
 サーバー再起動時に自動起動させるため、[NSSM](https://nssm.cc/) を使って Windows サービスとして登録します。
+**初回のみ**以下を実行してください。登録後はサーバー再起動時にバックエンドが自動で起動します。
 
 ```bat
 :: NSSM をダウンロード・展開後:
 nssm install pdf2tiff "C:\Program Files\nodejs\node.exe"
-nssm set pdf2tiff AppParameters "C:\inetpub\pdf-2-tiff\backend\index.js"
-nssm set pdf2tiff AppDirectory "C:\inetpub\pdf-2-tiff\backend"
-nssm set pdf2tiff AppStdout "C:\inetpub\pdf-2-tiff\logs\service.log"
-nssm set pdf2tiff AppStderr "C:\inetpub\pdf-2-tiff\logs\service-error.log"
+nssm set pdf2tiff AppParameters "C:\pdf-2-tiff\backend\index.js"
+nssm set pdf2tiff AppDirectory "C:\pdf-2-tiff\backend"
+nssm set pdf2tiff AppStdout "C:\pdf-2-tiff\logs\service.log"
+nssm set pdf2tiff AppStderr "C:\pdf-2-tiff\logs\service-error.log"
 nssm start pdf2tiff
 ```
 
-> `C:\inetpub\pdf-2-tiff\logs\` ディレクトリは事前に作成してください。
+> `C:\pdf-2-tiff\logs\` ディレクトリは事前に作成してください。
 
 サービスの操作:
 ```bat
@@ -107,7 +109,7 @@ nssm stop pdf2tiff      :: 停止
 2. 「**アプリケーションの追加**」を選択
 3. 以下を設定:
    - **エイリアス**: `pdf-2-tiff`
-   - **物理パス**: `C:\inetpub\pdf-2-tiff\frontend\dist`
+   - **物理パス**: `C:\pdf-2-tiff\frontend\dist`
 
 #### 4-4. web.config の配置
 
@@ -162,12 +164,24 @@ http://<サーバー名>/pdf-2-tiff/
 
 ---
 
+## サーバー再起動時
+
+NSSM でサービス登録済み（手順 3-B）であれば、**サーバー再起動後にバックエンドは自動起動します**。手動での操作は不要です。
+
+再起動後にうまく動かない場合:
+```bat
+nssm status pdf2tiff    :: サービスが Running か確認
+nssm restart pdf2tiff   :: 必要に応じて再起動
+```
+
+---
+
 ## アップデート手順
 
 ソースコードの更新を反映する手順:
 
 ```bat
-cd C:\inetpub\pdf-2-tiff
+cd C:\pdf-2-tiff
 git pull
 
 :: フロントエンド再ビルド

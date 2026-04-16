@@ -1,10 +1,10 @@
 @echo off
 echo Starting PDF to TIFF Converter in Development Mode...
 
+REM Start Backend in background
 echo Starting Backend...
-start cmd /k "cd backend && node index.js"
+start /b node backend/index.js
 
-echo Starting Frontend...
-start cmd /k "cd frontend && npm run dev"
-
-echo Done. Open http://localhost:5173 to access the app.
+echo Starting Frontend in new window (Ctrl+C to stop)...
+cd frontend
+call npm run dev
