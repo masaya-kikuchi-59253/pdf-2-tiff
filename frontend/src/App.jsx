@@ -19,6 +19,31 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const API_BASE = window.location.port === '5173' ? 'http://localhost:3001' : '';
 
+function parsePageNum(fileName) {
+  const m = fileName.match(/_page_(\d+)\.tif$/i);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+function buildDownloadName({
+  originalBase, pageNum, totalPages,
+  digitOnly, suffixEnabled, suffix, pageAtEnd, extension
+}) {
+  let base = originalBase;
+  if (digitOnly) {
+    const transformed = base.replace(/\D+/g, '_').replace(/^_+|_+$/g, '');
+    base = transformed || originalBase;
+  }
+
+  const padLen = String(totalPages || 1).length;
+  const pagePart = pageNum != null ? `_${String(pageNum).padStart(padLen, '0')}` : '';
+
+  const cleanSuffix = (suffix || '').replace(/[\\/:*?"<>|]/g, '').trim();
+  const suffixPart = suffixEnabled && cleanSuffix ? `_${cleanSuffix}` : '';
+
+  const tail = pageAtEnd ? `${suffixPart}${pagePart}` : `${pagePart}${suffixPart}`;
+  return `${base}${tail}.${extension}`;
+}
+
 const App = () => {
   const [file, setFile] = useState(null);
   const [pdfInfo, setPdfInfo] = useState(null);
@@ -32,6 +57,11 @@ const App = () => {
   const [comparison, setComparison] = useState(null); // { tiffUrl, pdfUrl, previewUrl }
   const [dpi, setDpi] = useState(400); // 200, 300, 400, 600
   const [split, setSplit] = useState(true); // true: page by page, false: single file
+  const [digitOnly, setDigitOnly] = useState(false);
+  const [suffixEnabled, setSuffixEnabled] = useState(false);
+  const [suffix, setSuffix] = useState('');
+  const [pageAtEnd, setPageAtEnd] = useState(true);
+  const [extension, setExtension] = useState('tiff');
 
   const handleStartConvert = async (directPath = null) => {
     const p = directPath || pdfInfo?.path;
@@ -91,12 +121,20 @@ const App = () => {
     accept: { 'application/pdf': ['.pdf'] },
     multiple: false
   });
+  const getDownloadName = (r) => buildDownloadName({
+    originalBase: (pdfInfo?.filename ?? 'output').replace(/\.pdf$/i, ''),
+    pageNum: parsePageNum(r.name),
+    totalPages: pdfInfo?.pages ?? 1,
+    digitOnly, suffixEnabled, suffix, pageAtEnd, extension,
+  });
+
   const downloadAll = () => {
     results.forEach((r, idx) => {
       setTimeout(() => {
+        const dlName = getDownloadName(r);
         const link = document.createElement('a');
-        link.href = `${API_BASE}/api/download?file=${encodeURIComponent(r.relPath)}&name=${encodeURIComponent(r.name)}`;
-        link.download = r.name;
+        link.href = `${API_BASE}/api/download?file=${encodeURIComponent(r.relPath)}&name=${encodeURIComponent(dlName)}`;
+        link.download = dlName;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -174,6 +212,84 @@ const App = () => {
                 />
                 <span style={{ fontSize: '14px' }}>1つのTIFFにまとめる</span>
               </label>
+            </div>
+          </div>
+
+          <div className="settings-group" style={{ alignItems: 'flex-start' }}>
+            <Settings size={18} color="var(--text-muted)" style={{ marginTop: '2px' }} />
+            <span className="settings-label" style={{ lineHeight: 1, marginTop: '3px' }}>ファイル名:</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <label className="radio-label">
+                <input
+                  type="checkbox"
+                  checked={digitOnly}
+                  onChange={e => setDigitOnly(e.target.checked)}
+                />
+                <span style={{ fontSize: '14px' }}>数字と "_" のみにする</span>
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minHeight: '28px' }}>
+                <label className="radio-label">
+                  <input
+                    type="checkbox"
+                    checked={suffixEnabled}
+                    onChange={e => setSuffixEnabled(e.target.checked)}
+                  />
+                  <span style={{ fontSize: '14px' }}>suffix を付ける</span>
+                </label>
+                {suffixEnabled && (
+                  <input
+                    type="text"
+                    value={suffix}
+                    onChange={e => setSuffix(e.target.value)}
+                    placeholder="例: 1, v2, rev3"
+                    style={{
+                      fontSize: '13px',
+                      padding: '3px 8px',
+                      border: '1px solid var(--border)',
+                      borderRadius: '6px',
+                      width: '130px',
+                    }}
+                  />
+                )}
+              </div>
+              {suffixEnabled && split && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: '32px' }}>
+                  <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>suffix の位置:</span>
+                  <label className="radio-label">
+                    <input
+                      type="radio"
+                      checked={pageAtEnd}
+                      onChange={() => setPageAtEnd(true)}
+                    />
+                    <span style={{ fontSize: '13px' }}>ページ番号の前</span>
+                  </label>
+                  <label className="radio-label">
+                    <input
+                      type="radio"
+                      checked={!pageAtEnd}
+                      onChange={() => setPageAtEnd(false)}
+                    />
+                    <span style={{ fontSize: '13px' }}>ページ番号の後</span>
+                  </label>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="settings-group">
+            <Settings size={18} color="var(--text-muted)" />
+            <span className="settings-label">拡張子:</span>
+            <div className="radio-group">
+              {['.tiff', '.tif'].map(ext => (
+                <label key={ext} className="radio-label">
+                  <input
+                    type="radio"
+                    checked={extension === ext.slice(1)}
+                    onChange={() => setExtension(ext.slice(1))}
+                  />
+                  <span style={{ fontSize: '14px' }}>{ext}</span>
+                </label>
+              ))}
             </div>
           </div>
         </div>
@@ -271,8 +387,8 @@ const App = () => {
               <div key={i} className="result-item">
                 <img src={`${API_BASE}${r.preview}`} alt={r.name} className="result-thumb" />
                 <div className="result-info">
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100px' }}>
-                    {r.name}
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100px' }} title={getDownloadName(r)}>
+                    {getDownloadName(r)}
                   </span>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button
@@ -282,8 +398,8 @@ const App = () => {
                       <Eye size={16} />
                     </button>
                     <a
-                      href={`${API_BASE}/api/download?file=${encodeURIComponent(r.relPath)}&name=${encodeURIComponent(r.name)}`}
-                      download={r.name}
+                      href={`${API_BASE}/api/download?file=${encodeURIComponent(r.relPath)}&name=${encodeURIComponent(getDownloadName(r))}`}
+                      download={getDownloadName(r)}
                       style={{ color: 'var(--primary)' }}
                     >
                       <Download size={16} />
