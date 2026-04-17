@@ -184,14 +184,16 @@ nssm restart pdf2tiff   :: 必要に応じて再起動
 cd C:\pdf-2-tiff
 git pull
 
+:: バックエンドの依存パッケージを更新
+cd backend
+npm install
+cd ..
+
 :: フロントエンド再ビルド
 cd frontend
 npm install
 npm run build
 cd ..
-
-:: web.config を dist に再配置（消えるため）
-copy web.config frontend\dist\web.config
 
 :: バックエンド再起動
 nssm restart pdf2tiff

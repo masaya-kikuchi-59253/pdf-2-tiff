@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const API_BASE = window.location.port === '5173' ? 'http://localhost:3001' : '';
+const API_BASE = window.location.port === '5173' ? 'http://localhost:3001' : '/pdf-2-tiff';
 
 function parsePageNum(fileName) {
   const m = fileName.match(/_page_(\d+)\.tif$/i);
