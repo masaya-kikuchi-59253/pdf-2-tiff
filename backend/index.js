@@ -4,7 +4,7 @@ const multer = require('multer');
 const { exec } = require('child_process');
 const fs = require('fs-extra');
 const path = require('path');
-const { PDFDocument, PDFName, PDFDict, PDFArray, PDFRef, PDFStream, PDFRawStream, PDFNumber } = require('pdf-lib');
+const { PDFDocument } = require('pdf-lib');
 const yaml = require('js-yaml');
 require('dotenv').config();
 
@@ -94,19 +94,29 @@ app.post('/api/convert', async (req, res) => {
         fs.ensureDirSync(sessionOutDir);
 
         // 1. Determine mode if auto
+        let debugStats = [];
         let finalMode = mode;
         if (mode === 'auto') {
-            try {
-                // pdf-lib でカラースペース構造を解析
-                // 全ページ明示的グレースケール → BW、それ以外（不明含む）→ COLOR
-                const pdfData = await fs.readFile(pdfPath);
-                const pdfDoc = await PDFDocument.load(pdfData, { ignoreEncryption: true });
-                const csAnalysis = analyzeColorSpaces(pdfDoc);
-                finalMode = csAnalysis.allGrayscale ? 'bw' : 'color';
-            } catch (pdfLibErr) {
-                console.warn('pdf-lib analysis failed, defaulting to color:', pdfLibErr.message);
-                finalMode = 'color';
+            const inkcovCmd = `"${GS_PATH}" -o - -sDEVICE=inkcov -dNOPAUSE -dBATCH "${pdfPath}"`;
+            const gsOutput = await execPromise(inkcovCmd);
+
+            const lines = gsOutput.split(/\r?\n/);
+            let hasColor = false;
+            for (const line of lines) {
+                if (line.includes('CMYK OK')) {
+                    const values = line.trim().split(/\s+/);
+                    if (values.length >= 3) {
+                        const cyan = parseFloat(values[0]);
+                        const magenta = parseFloat(values[1]);
+                        const yellow = parseFloat(values[2]);
+                        debugStats.push({ cyan, magenta, yellow });
+                        if (cyan > 0.1 || magenta > 0.1 || yellow > 0.1) {
+                            hasColor = true;
+                        }
+                    }
+                }
             }
+            finalMode = hasColor ? 'color' : 'bw';
         }
 
         // 2. Convert to TIFF & PNG previews
@@ -163,7 +173,7 @@ app.post('/api/convert', async (req, res) => {
                 };
             });
 
-        res.json({ files: resultFiles, mode: finalMode, split });
+        res.json({ files: resultFiles, mode: finalMode, debugStats, split });
 
 
         // 5. Cleanup: delete uploaded PDF (non-blocking)
@@ -208,169 +218,6 @@ function execPromise(cmd) {
             resolve(stdout + stderr);
         });
     });
-}
-
-// カラースペース分類: 'gray' | 'color' | 'unknown'
-function classifyColorSpace(csObj, context, depth = 0) {
-    if (depth > 5 || !csObj) return 'unknown';
-
-    const resolved = (csObj instanceof PDFRef) ? context.lookup(csObj) : csObj;
-    if (!resolved) return 'unknown';
-
-    if (resolved instanceof PDFName) {
-        const name = resolved.decodeText();
-        if (name === 'DeviceGray') return 'gray';
-        if (name === 'DeviceRGB' || name === 'DeviceCMYK') return 'color';
-        return 'unknown';
-    }
-
-    if (resolved instanceof PDFArray) {
-        const typeObj = resolved.get(0);
-        const typeName = (typeObj instanceof PDFName)
-            ? typeObj.decodeText()
-            : (context.lookupMaybe(typeObj, PDFName) || { decodeText: () => '' }).decodeText();
-
-        switch (typeName) {
-            case 'DeviceGray':
-            case 'CalGray':
-                return 'gray';
-            case 'DeviceRGB':
-            case 'CalRGB':
-            case 'Lab':
-            case 'DeviceCMYK':
-            case 'Separation':
-            case 'DeviceN':
-            case 'Pattern':
-                return 'color';
-            case 'ICCBased': {
-                const streamRef = resolved.get(1);
-                const stream = context.lookup(streamRef);
-                if (stream && (stream instanceof PDFStream || stream instanceof PDFRawStream)) {
-                    const nObj = stream.dict.get(PDFName.of('N'));
-                    const n = (nObj instanceof PDFNumber)
-                        ? nObj.asNumber()
-                        : context.lookupMaybe(nObj, PDFNumber)?.asNumber();
-                    if (n === 1) return 'gray';
-                    if (n === 3 || n === 4) return 'color';
-                }
-                return 'unknown';
-            }
-            case 'Indexed':
-                return classifyColorSpace(resolved.get(1), context, depth + 1);
-            default:
-                return 'unknown';
-        }
-    }
-
-    return 'unknown';
-}
-
-// XObject (画像・Form) のカラースペースを検査
-// csDict: ページ or Form の ColorSpace 辞書（名前付き CS エイリアス解決用、null 可）
-// 戻り値: 'gray' | 'color' | 'unknown' | 'noinfo'
-function checkXObjects(xobjDict, context, csDict, depth = 0) {
-    if (depth > 3 || !xobjDict) return 'noinfo';
-
-    const resolvedDict = (xobjDict instanceof PDFRef)
-        ? context.lookupMaybe(xobjDict, PDFDict)
-        : (xobjDict instanceof PDFDict ? xobjDict : null);
-    if (!resolvedDict) return 'noinfo';
-
-    let foundGray = false;
-
-    for (const [, value] of resolvedDict.entries()) {
-        const xobj = context.lookup(value);
-        if (!xobj) continue;
-
-        const dict = (xobj instanceof PDFStream || xobj instanceof PDFRawStream) ? xobj.dict : null;
-        if (!dict) continue;
-
-        const subtype = dict.get(PDFName.of('Subtype'));
-        const subtypeName = (subtype instanceof PDFName) ? subtype.decodeText() : '';
-
-        if (subtypeName === 'Image') {
-            let cs = dict.get(PDFName.of('ColorSpace'));
-            // /CS0 等の名前付き CS エイリアスをページ/Form の辞書から解決
-            if (cs instanceof PDFName && csDict) {
-                const aliased = csDict.get(cs);
-                if (aliased) cs = aliased;
-            }
-            if (cs) {
-                const result = classifyColorSpace(cs, context);
-                if (result === 'color' || result === 'unknown') return result;
-                if (result === 'gray') foundGray = true;
-            }
-        } else if (subtypeName === 'Form') {
-            const innerResources = dict.get(PDFName.of('Resources'));
-            if (innerResources) {
-                const innerDict = context.lookupMaybe(innerResources, PDFDict);
-                if (innerDict) {
-                    const innerCSEntry = innerDict.get(PDFName.of('ColorSpace'));
-                    const innerCSDict = innerCSEntry ? context.lookupMaybe(innerCSEntry, PDFDict) : null;
-                    if (innerCSDict) {
-                        for (const [, csVal] of innerCSDict.entries()) {
-                            const r = classifyColorSpace(csVal, context);
-                            if (r === 'color' || r === 'unknown') return r;
-                            if (r === 'gray') foundGray = true;
-                        }
-                    }
-                    const innerXObj = innerDict.get(PDFName.of('XObject'));
-                    if (innerXObj) {
-                        const r = checkXObjects(innerXObj, context, innerCSDict, depth + 1);
-                        if (r === 'color' || r === 'unknown') return r;
-                        if (r === 'gray') foundGray = true;
-                    }
-                }
-            }
-        }
-    }
-    return foundGray ? 'gray' : 'noinfo';
-}
-
-// pdf-lib によるカラースペース構造解析
-// 方針: 不明・証拠なし → COLOR（情報を失わない）、確実にグレーのみ → BW
-function analyzeColorSpaces(pdfDoc) {
-    const context = pdfDoc.context;
-    const pages = pdfDoc.getPages();
-    let foundGrayscaleEvidence = false;
-
-    for (const page of pages) {
-        const resources = page.node.Resources();
-        // Resources なし → CS 情報不明 → COLOR
-        if (!resources) return { allGrayscale: false };
-
-        let pageHasCSInfo = false;
-
-        // ColorSpace 辞書を取得・検査
-        const csEntry = resources.get(PDFName.of('ColorSpace'));
-        const csDict = csEntry ? context.lookupMaybe(csEntry, PDFDict) : null;
-        if (csDict) {
-            for (const [, value] of csDict.entries()) {
-                const result = classifyColorSpace(value, context);
-                if (result !== 'gray') return { allGrayscale: false };
-                pageHasCSInfo = true;
-                foundGrayscaleEvidence = true;
-            }
-        }
-
-        // XObject を検査（ページの CS 辞書を渡して名前付き CS エイリアスを解決）
-        const xobjEntry = resources.get(PDFName.of('XObject'));
-        if (xobjEntry) {
-            const xResult = checkXObjects(xobjEntry, context, csDict);
-            if (xResult === 'color' || xResult === 'unknown') return { allGrayscale: false };
-            if (xResult === 'gray') {
-                pageHasCSInfo = true;
-                foundGrayscaleEvidence = true;
-            }
-            // 'noinfo' = CS 証拠なし → pageHasCSInfo は立てない
-        }
-
-        // このページに CS 証拠なし（テキストのみ等）→ 不明 → COLOR
-        if (!pageHasCSInfo) return { allGrayscale: false };
-    }
-
-    // 全ページで明示的なグレースケール証拠があった場合のみ BW
-    return { allGrayscale: foundGrayscaleEvidence };
 }
 
 // Periodic cleanup: remove output & upload directories older than 1 hour

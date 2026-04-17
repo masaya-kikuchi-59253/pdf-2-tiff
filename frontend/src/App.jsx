@@ -51,6 +51,7 @@ const App = () => {
   const [converting, setConverting] = useState(false);
   const [results, setResults] = useState([]);
   const [finalMode, setFinalMode] = useState(null);
+  const [debugStats, setDebugStats] = useState(null);
   const [error, setError] = useState(null);
   const [showWarning, setShowWarning] = useState(false);
   const [comparison, setComparison] = useState(null); // { tiffUrl, pdfUrl, previewUrl }
@@ -137,6 +138,7 @@ const App = () => {
       });
       setResults(res.data.files);
       setFinalMode(res.data.mode);
+      setDebugStats(res.data.debugStats);
     } catch (err) {
       setError("変換に失敗しました。Ghostscriptが正しく構成されているか確認してください。");
     } finally {
@@ -152,6 +154,7 @@ const App = () => {
     setPdfInfo(null);
     setResults([]);
     setFinalMode(null);
+    setDebugStats(null);
     setError(null);
 
     const formData = new FormData();
@@ -419,6 +422,13 @@ const App = () => {
                   gap: '10px'
                 }}>
                   <span>{finalMode === 'color' ? '🎨 カラー ' : '⚫️ 白黒 '}</span>
+                  {debugStats && debugStats.length > 0 && (
+                    <span style={{ fontSize: '10px', opacity: 0.7, borderLeft: '1px solid currentColor', paddingLeft: '10px', fontWeight: 400 }}>
+                      Max: C:{Math.max(...debugStats.map(s => s.cyan)).toFixed(4)},
+                      M:{Math.max(...debugStats.map(s => s.magenta)).toFixed(4)},
+                      Y:{Math.max(...debugStats.map(s => s.yellow)).toFixed(4)}
+                    </span>
+                  )}
                 </div>
               )}
             </div>
