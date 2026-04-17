@@ -16,8 +16,12 @@ const PRESETS_PATH = path.join(__dirname, 'presets.yaml');
 function normalizeUploadedFilename(name = '') {
     if (!name) return 'upload.pdf';
 
-    const looksMojibake = /Ã.|â|ã|�/.test(name);
-    const decoded = looksMojibake ? Buffer.from(name, 'latin1').toString('utf8') : name;
+    let decoded = name;
+    try {
+        const buf = Buffer.from(name, 'latin1');
+        const utf8 = buf.toString('utf8');
+        if (!/\uFFFD/.test(utf8)) decoded = utf8;
+    } catch {}
 
     return decoded
         .normalize('NFC')
