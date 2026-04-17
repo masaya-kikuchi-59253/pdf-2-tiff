@@ -40,9 +40,7 @@ const storage = multer.diskStorage({
         cb(null, sessionDir);
     },
     filename: (req, file, cb) => {
-        const normalized = normalizeUploadedFilename(file.originalname);
-        file.originalname = normalized;
-        cb(null, normalized);
+        cb(null, 'upload.pdf');
     }
 });
 
