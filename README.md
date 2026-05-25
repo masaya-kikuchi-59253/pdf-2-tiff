@@ -290,6 +290,10 @@ presets:
 | **変換結果ファイル** | 変換後の TIFF / PNG プレビューファイルは、1時間経過後に自動クリーンアップされます（`MAX_AGE_MS` で調整可能）。 |
 | **外部API連携** | 外部の API やクラウドサービスへの接続は一切ありません。すべての処理はローカルサーバー上で完結します。 |
 
+## 変更履歴
+
+リリースごとの変更内容は [CHANGELOG.md](./CHANGELOG.md) を参照してください。
+
 ## License
 
 This project is licensed under the [MIT License](./LICENSE).
