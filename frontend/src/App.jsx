@@ -452,7 +452,7 @@ const App = () => {
               ) : (
                 <Download size={18} style={{ marginRight: '8px' }} />
               )}
-              {zipping ? 'ZIP 作成中...' : 'ZIP で一括ダウンロード'}
+              {zipping ? 'ZIP 作成中...' : 'ZIP でダウンロード'}
             </button>
           </div>
           <div className="result-list">
