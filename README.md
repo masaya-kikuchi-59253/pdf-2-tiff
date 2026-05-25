@@ -12,7 +12,7 @@ Ghostscript を利用して PDF を高品質 TIFF（300 DPI）に変換する We
 - **Manual Overrides**: Force Color or B&W mode.
 - **Large PDF Warning**: Alerts users if the PDF exceeds 10 pages.
 - **Comparison View**: Side-by-side view (Original PDF vs. TIFF result).
-- **Multiple Downloads**: Download individual TIFFs or "Download All" as separate files.
+- **Multiple Downloads**: Download individual TIFFs, or grab them all as a single ZIP (one Save dialog).
 
 ---
 
