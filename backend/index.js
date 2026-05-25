@@ -6,6 +6,7 @@ const fs = require('fs-extra');
 const path = require('path');
 const { PDFDocument } = require('pdf-lib');
 const yaml = require('js-yaml');
+const archiver = require('archiver');
 require('dotenv').config();
 
 const app = express();
@@ -197,6 +198,50 @@ app.get('/api/download', (req, res) => {
 
     const downloadName = normalizeUploadedFilename(name || path.basename(filePath));
     res.download(filePath, downloadName);
+});
+
+// Resolve a relPath safely under OUT_DIR (rejects traversal). Returns null on invalid.
+function resolveOutputPath(relPath) {
+    if (!relPath || typeof relPath !== 'string') return null;
+    const resolved = path.resolve(OUT_DIR, relPath);
+    const outRoot = path.resolve(OUT_DIR) + path.sep;
+    if (!resolved.startsWith(outRoot)) return null;
+    return resolved;
+}
+
+app.post('/api/download-zip', (req, res) => {
+    const { files, zipName } = req.body || {};
+    if (!Array.isArray(files) || files.length === 0) {
+        return res.status(400).json({ error: 'files required' });
+    }
+
+    const resolved = [];
+    for (const entry of files) {
+        const filePath = resolveOutputPath(entry?.relPath);
+        if (!filePath || !fs.existsSync(filePath)) {
+            return res.status(400).json({ error: `invalid file: ${entry?.relPath}` });
+        }
+        const name = normalizeUploadedFilename(entry?.name || path.basename(filePath));
+        resolved.push({ filePath, name });
+    }
+
+    const outName = normalizeUploadedFilename(zipName || 'tiffs.zip');
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition',
+        `attachment; filename="download.zip"; filename*=UTF-8''${encodeURIComponent(outName)}`);
+
+    // store-only (TIFF data doesn't compress well; keeps CPU + latency low)
+    const archive = archiver('zip', { store: true });
+    archive.on('error', err => {
+        console.error('archiver error:', err);
+        if (!res.headersSent) res.status(500).end();
+        else res.destroy(err);
+    });
+    archive.pipe(res);
+    for (const { filePath, name } of resolved) {
+        archive.file(filePath, { name });
+    }
+    archive.finalize();
 });
 
 // Proxy static assets for better control

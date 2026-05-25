@@ -185,18 +185,32 @@ const App = () => {
     digitOnly, suffixEnabled, suffix, pageAtEnd, extension,
   });
 
-  const downloadAll = () => {
-    results.forEach((r, idx) => {
-      setTimeout(() => {
-        const dlName = getDownloadName(r);
-        const link = document.createElement('a');
-        link.href = `${API_BASE}/api/download?file=${encodeURIComponent(r.relPath)}&name=${encodeURIComponent(dlName)}`;
-        link.download = dlName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }, idx * 500); // Slightly more delay to avoid browser blocking
-    });
+  const [zipping, setZipping] = useState(false);
+
+  const downloadAll = async () => {
+    if (zipping || results.length === 0) return;
+    setZipping(true);
+    try {
+      const baseName = (pdfInfo?.filename ?? 'output').replace(/\.pdf$/i, '');
+      const payload = {
+        zipName: `${baseName}.zip`,
+        files: results.map(r => ({ relPath: r.relPath, name: getDownloadName(r) })),
+      };
+      const res = await axios.post(`${API_BASE}/api/download-zip`, payload, { responseType: 'blob' });
+
+      const url = URL.createObjectURL(res.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = payload.zipName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError('ZIP のダウンロードに失敗しました。');
+    } finally {
+      setZipping(false);
+    }
   };
 
   return (
@@ -432,8 +446,13 @@ const App = () => {
                 </div>
               )}
             </div>
-            <button className="btn btn-primary" onClick={downloadAll}>
-              <Download size={18} style={{ marginRight: '8px' }} /> 一括ダウンロード
+            <button className="btn btn-primary" onClick={downloadAll} disabled={zipping}>
+              {zipping ? (
+                <Loader2 className="animate-spin" size={18} style={{ marginRight: '8px' }} />
+              ) : (
+                <Download size={18} style={{ marginRight: '8px' }} />
+              )}
+              {zipping ? 'ZIP 作成中...' : 'ZIP で一括ダウンロード'}
             </button>
           </div>
           <div className="result-list">
